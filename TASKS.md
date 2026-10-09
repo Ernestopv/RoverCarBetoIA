@@ -313,8 +313,19 @@ Not all sensors are guaranteed, so the fields must stay optional.
 
 ## T-007 · Decide Wi-Fi vs serial transport for the WAVE ROVER
 
-**Status:** in progress
+**Status:** done
 **Detected in:** `docs/specs/wave-rover.md`, "Pending decision".
+
+> **How it was resolved (session summary):** the transport-agnostic logic was
+> extracted into `app/rover/wave_rover_chassis.py`; `WaveRoverWifiDriver` became a
+> thin HTTP transport over it, and a new `WaveRoverSerialDriver` (pyserial) added
+> the UART path. Selection is `WAVE_ROVER_TRANSPORT` (`wifi` default; `serial`
+> opted in on the Pi). The serial driver **does not wait for a reply on motion
+> commands** (fire-and-forget, like Wi-Fi) and skips the chassis's command echo;
+> status/rate queries still read the reply. Verified: benched in the container on
+> the unit with the rover stopped, then driven live — command latency dropped from
+> ~1 s (waiting for feedback) to **35–51 ms** end-to-end. The container user was
+> added to the `dialout` group (`Dockerfile.pi`) so it can open `/dev/ttyAMA0`.
 
 ### Findings (verified on the unit, 2026-10-09)
 
@@ -335,8 +346,9 @@ Not all sensors are guaranteed, so the fields must stay optional.
 ### Decision
 
 Add a serial transport **behind the same `Rover` interface**, selectable with
-`WAVE_ROVER_TRANSPORT` (`wifi` stays the default). Serial is opt-in until it is
-benched and trusted; Wi-Fi remains the control path if anything regresses.
+`WAVE_ROVER_TRANSPORT`. It is **benched and verified**, and runs in production on
+the unit (`WAVE_ROVER_TRANSPORT=serial`); `wifi` remains the **code default**, so
+rolling back is just removing that line from the Pi's `.env`.
 
 ### Scope
 
@@ -348,9 +360,9 @@ benched and trusted; Wi-Fi remains the control path if anything regresses.
 ### Acceptance criteria
 
 - [x] `/dev/ttyAMA0` enabled and the chassis answers (verified).
-- [ ] Serial transport behind the same interface; Wi-Fi default unchanged.
-- [ ] Tests added; simulator and API unaffected.
-- [ ] Bench test with the rover stopped.
+- [x] Serial transport behind the same interface; Wi-Fi default unchanged.
+- [x] Tests added; simulator and API unaffected.
+- [x] Bench test with the rover stopped.
 
 ### Notes and risks
 
