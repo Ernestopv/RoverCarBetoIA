@@ -1,0 +1,9 @@
+# Development and test dependencies.
+# `httpx` is a runtime dependency now (the WAVE ROVER driver uses it), so it
+# comes in through requirements.txt.
+-r requirements.txt
+
+pytest>=8.3,<9.0
+pytest-asyncio>=0.24,<2.0
+ruff>=0.8,<1.0
+mypy>=1.13,<2.0

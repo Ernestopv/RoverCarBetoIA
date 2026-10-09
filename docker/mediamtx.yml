@@ -1,0 +1,73 @@
+# MediaMTX configuration for RoverCarBeto.
+#
+# MediaMTX is the only intermediary between the camera and the browser:
+#
+#   camera (Picamera2 / simulator) --> MediaMTX --> WebRTC (WHEP) --> React
+#
+# Reference: https://github.com/bluenviron/mediamtx
+
+logLevel: info
+logDestinations: [stdout]
+
+# Our H.264 RTP payloads come in at 1460 bytes. `udpMaxPayloadSize` counts the
+# whole UDP payload *including the 12-byte RTP header*, so 1472 is the value that
+# lets a 1460-byte payload through: 1460 + 12 = 1472. With 1472 + 8 (UDP) +
+# 20 (IP) = 1500 it still fits a standard ethernet MTU, so no remux and no
+# fragmentation. Before this, MediaMTX's default (1452 -> 1440 payload) made it
+# remux every packet. See T-002 in TASKS.md.
+udpMaxPayloadSize: 1472
+
+# Control API. Used for local diagnostics of the live stream.
+api: true
+apiAddress: :9997
+
+# NOTE: declaring this list replaces the built-in default, so the publish/read
+# rules must be kept here or the stream would stop working.
+authInternalUsers:
+  # Publishing (the camera) and reading (the browser) are open inside the
+  # deployment network: this is a private rover, not a public media server.
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: publish
+      - action: read
+      - action: playback
+  # Control API: local diagnostics only. The port is published on 127.0.0.1,
+  # so this never exposes the API to the network.
+  - user: any
+    pass:
+    ips: ["127.0.0.1", "::1", "172.16.0.0/12", "10.0.0.0/8"]
+    permissions:
+      - action: api
+      - action: metrics
+
+# Ingress: the camera publishes here.
+rtsp: true
+rtspAddress: :8554
+
+# Egress: the browser plays here over WebRTC.
+webrtc: true
+webrtcAddress: :8889
+webrtcAllowOrigins: ["*"]
+webrtcIPsFromInterfaces: true
+webrtcLocalUDPAddress: :8189
+
+# Protocols the project does not use. Disabled to reduce the attack surface.
+hls: false
+rtmp: false
+srt: false
+moq: false
+playback: false
+metrics: false
+pprof: false
+
+pathDefaults:
+  # RoverCarBeto never records video or images. Keep this false: enabling it
+  # would write camera media to disk, which the project forbids.
+  record: false
+
+paths:
+  rover:
+    # The stream is provided by the backend's camera module.
+    source: publisher

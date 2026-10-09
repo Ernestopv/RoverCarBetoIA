@@ -1,0 +1,81 @@
+# RoverCarBeto backend for the Raspberry Pi (AI Camera / IMX500) - Fase 5b.
+#
+# The base is Debian Trixie, the same family the board runs, because picamera2
+# and libcamera are NOT in Debian. They come from the Raspberry Pi archive and
+# are built against Trixie.
+#
+#   docker build -f Dockerfile.pi -t rovercarbeto-api:pi .
+FROM debian:trixie-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PATH=/opt/venv/bin:$PATH
+
+# Raspberry Pi archive: libcamera, picamera2 and the IMX500 tooling.
+#
+# `python3-munkres` and `python3-opencv` are for the POSE decoder only: picamera2's
+# `postprocess_highernet` imports OpenCV at module level and raises on import if
+# `munkres` is missing. Detection needs neither, but the image serves both.
+#
+# The keyring MUST come from the `raspberrypi-archive-keyring` package, not from
+# the standalone `raspberrypi.gpg.key`. That standalone key carries SHA-1
+# self-signatures, and apt's `sqv` has rejected those since 2026-02-01:
+#
+#   Signing key ... is not bound: No binding signature
+#   because: SHA1 is not considered secure since 2026-02-01
+#
+# which makes `apt-get update` fail with exit code 100. The packaged keyring is
+# the one Raspberry Pi OS itself uses, and it passes.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && curl -fsSL -o /tmp/rpi-keyring.deb \
+         "http://archive.raspberrypi.com/debian/pool/main/r/raspberrypi-archive-keyring/raspberrypi-archive-keyring_2025.1+rpt1_all.deb" \
+    && dpkg -i /tmp/rpi-keyring.deb \
+    && rm /tmp/rpi-keyring.deb \
+    && echo "deb [signed-by=/usr/share/keyrings/raspberrypi-archive-keyring.pgp] http://archive.raspberrypi.com/debian/ trixie main" \
+         > /etc/apt/sources.list.d/raspi.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+         python3 \
+         python3-venv \
+         python3-pip \
+         python3-picamera2 \
+         python3-libcamera \
+         python3-munkres \
+         python3-opencv \
+         ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# A venv that ALSO sees the system's picamera2 and libcamera. Installing those
+# from PyPI does not work: they need the matching libcamera system library.
+RUN python3 -m venv --system-site-packages /opt/venv \
+    && /opt/venv/bin/pip install --upgrade pip
+
+COPY requirements.txt ./
+RUN /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+
+# Non-root, but in three groups that matter:
+#
+#  - `video` (gid 44): /dev/dma_heap/* and /dev/v4l-subdev* are root:video 0660.
+#  - `sudo` (gid 27): /sys/kernel/debug is root:sudo 0750, and picamera2 reads
+#    the IMX500 firmware-upload progress from there. Without it, picamera2 falls
+#    back to the `INDIRECT` path, which shells out to `sudo -n
+#    /usr/sbin/debug_stream_imx500.sh`; `sudo` is not installed, and picamera2
+#    only catches `CalledProcessError`, so the whole start() dies with
+#    "No such file or directory: 'sudo'".
+#  - `dialout` (gid 20): /dev/ttyAMA0 is root:dialout 0660 — the WAVE ROVER
+#    header UART used by the serial transport.
+RUN useradd --create-home --uid 1000 --groups video,sudo,dialout rover \
+    && chown -R rover:rover /app
+USER rover
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')"
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,15 @@
+# Runtime dependencies for the RoverCarBeto backend.
+# Keep this list minimal: every dependency must have a clear reason to exist.
+
+fastapi>=0.115,<1.0
+uvicorn>=0.32,<1.0
+pydantic>=2.9,<3.0
+pydantic-settings>=2.6,<3.0
+# HTTP client: talks to the WAVE ROVER chassis over Wi-Fi (Phase 4).
+httpx>=0.27,<1.0
+# WebSocket support for uvicorn. Without it, uvicorn silently serves no
+# WebSocket at all and an upgrade request gets a 404 — the AI stream needs it.
+websockets>=13,<16
+# Serial transport for the WAVE ROVER (header UART, Phase 4). The chassis talks
+# JSON over /dev/ttyAMA0 at 115200; Wi-Fi stays the default control path.
+pyserial>=3.5,<4

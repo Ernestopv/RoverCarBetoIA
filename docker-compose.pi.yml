@@ -1,0 +1,84 @@
+# Raspberry Pi deployment override (Phase 5b).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.pi.yml up -d --build
+#
+# What changes versus the default stack:
+#
+#  - the API builds from Dockerfile.pi and runs the real IMX500 camera driver;
+#  - the camera needs /dev/dma_heap and /dev/v4l-subdev*, which are only
+#    reachable with full device access. Verified empirically on the Pi: without
+#    `privileged` the driver reports "Could not open any dmaHeap device".
+#    This is a real trade-off: that container has access to every device.
+#  - MediaMTX must advertise the Pi's LAN address, because the phone reaches it
+#    through the published port and cannot route to the container's own IPs.
+#
+# The API is published on 8001 by default so it never collides with anything
+# already running on the board.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.pi
+    privileged: true
+    volumes:
+      - /dev:/dev
+      - /run/udev:/run/udev:ro
+      - /sys:/sys:ro
+      - /lib/firmware:/lib/firmware:ro
+      - /usr/share/imx500-models:/usr/share/imx500-models:ro
+    environment:
+      # The real rover: the Pi is mounted on the chassis and talks to it over
+      # Wi-Fi. No motion happens until a motion command arrives.
+      ROVER_MODE: ${ROVER_MODE:-hardware}
+      # The WAVE ROVER network (the "UGV" AP), over wlan1.
+      WAVE_ROVER_HOST: ${WAVE_ROVER_HOST:-192.168.4.1}
+      WAVE_ROVER_PORT: ${WAVE_ROVER_PORT:-80}
+      WAVE_ROVER_TIMEOUT: ${WAVE_ROVER_TIMEOUT:-1.0}
+      WAVE_ROVER_TRANSPORT: ${WAVE_ROVER_TRANSPORT:-wifi}
+      WAVE_ROVER_SERIAL_PORT: ${WAVE_ROVER_SERIAL_PORT:-/dev/ttyAMA0}
+      WAVE_ROVER_MAX_SPEED: ${WAVE_ROVER_MAX_SPEED:-0.5}
+      # Calibration: adjusted from the .env without rebuilding the image.
+      WAVE_ROVER_SPEED_RATE: ${WAVE_ROVER_SPEED_RATE:-1.0}
+      WAVE_ROVER_LEFT_TRIM: ${WAVE_ROVER_LEFT_TRIM:-1.0}
+      WAVE_ROVER_RIGHT_TRIM: ${WAVE_ROVER_RIGHT_TRIM:-1.0}
+      # 3S Li-ion discharge curve (voltage V, percent). Without this passthrough
+      # the container can only use the built-in curve: the .env is not copied into
+      # the image, so Compose is what feeds the container's environment.
+      WAVE_ROVER_BATTERY_CURVE: "${WAVE_ROVER_BATTERY_CURVE:-[[12.60,100],[12.15,85],[11.91,70],[11.67,55],[11.40,40],[11.10,25],[10.80,12],[10.50,5],[10.20,2],[9.90,0]]}"
+      # Person following (Phase 7). Off unless explicitly enabled; every command
+      # still goes through the safety layer.
+      FOLLOW_AUTO_ENABLE: ${FOLLOW_AUTO_ENABLE:-false}
+      FOLLOW_TARGET_HEIGHT: ${FOLLOW_TARGET_HEIGHT:-0.7}
+      FOLLOW_MAX_LINEAR: ${FOLLOW_MAX_LINEAR:-0.4}
+      FOLLOW_MAX_ANGULAR: ${FOLLOW_MAX_ANGULAR:-0.6}
+      FOLLOW_MIN_LINEAR: ${FOLLOW_MIN_LINEAR:-0.15}
+      FOLLOW_FACE_DEADBAND: ${FOLLOW_FACE_DEADBAND:-0.2}
+      FOLLOW_LOST_TIMEOUT: ${FOLLOW_LOST_TIMEOUT:-10.0}
+      # Minimum confidence to report a detected object.
+      AI_SCORE_THRESHOLD: ${AI_SCORE_THRESHOLD:-0.5}
+      CAMERA_MODE: imx500
+      CAMERA_AUTOSTART: "true"
+      CAMERA_NETWORK_FILE: ${CAMERA_NETWORK_FILE:-/usr/share/imx500-models/imx500_network_efficientdet_lite0_pp.rpk}
+      CAMERA_WIDTH: ${CAMERA_WIDTH:-1280}
+      CAMERA_HEIGHT: ${CAMERA_HEIGHT:-720}
+      CAMERA_FPS: ${CAMERA_FPS:-30}
+      CAMERA_BUFFER_COUNT: ${CAMERA_BUFFER_COUNT:-3}
+      # The camera is mounted upside down on the robot: 180 degrees = hflip + vflip.
+      # Set only one to true if the mounting is merely mirrored.
+      CAMERA_HFLIP: ${CAMERA_HFLIP:-true}
+      CAMERA_VFLIP: ${CAMERA_VFLIP:-true}
+    ports: !override
+      - "${API_PORT:-8001}:8000"
+
+  mediamtx:
+    environment:
+      # The browser connects to http://<pi-lan-ip>:8889/rover/whep, so ICE must
+      # advertise that address.
+      MTX_WEBRTCADDITIONALHOSTS: ${MEDIAMTX_ADDITIONAL_HOSTS:-192.168.1.83}
+
+  ui:
+    # `!override` is required: Compose *appends* lists when merging files, so
+    # without it the base ports (8000/8080) would be published as well.
+    ports: !override
+      - "${UI_PORT:-8081}:80"

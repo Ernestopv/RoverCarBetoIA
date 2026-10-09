@@ -1,0 +1,1287 @@
+/* =========================================================================
+   RoverCarBeto — field console
+   The interface is styled as the control surface of a field rover rather than
+   a web dashboard: panel seams, tabular instrument readouts, a recessed stick
+   well and a physical stop key. Colour is functional — it always encodes a
+   state (motion, link, caution, stop), never decoration.
+   ========================================================================= */
+
+:root {
+  /* Base "hull" palette: deep petrol rather than pure black. */
+  --ink: #0b1518;
+  --hull: #112225;
+  --hull-2: #18302f;
+  --seam: #23403e;
+  --seam-soft: rgba(35, 64, 62, 0.3);
+
+  /* Type */
+  --chalk: #e7efea;
+  --mist: #90a8a3;
+
+  /* State colours */
+  --signal: #f2762e; /* active motion */
+  --green: #4fb477; /* link healthy */
+  --amber: #e4b23c; /* caution */
+  --red: #e0523f; /* stop / failure */
+
+  --font-ui: "Overpass Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "Overpass Mono Variable", ui-monospace, "SFMono-Regular", monospace;
+
+  /* Geometry varies by function instead of one radius for everything. */
+  --r-panel: 6px;
+  --r-inset: 4px;
+  --r-chip: 999px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--chalk);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.45;
+
+  /* Faint survey-paper grid, like a field notebook under the console. */
+  background-color: var(--ink);
+  background-image:
+    linear-gradient(var(--seam-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--seam-soft) 1px, transparent 1px);
+  background-size: 34px 34px;
+  background-position: center top;
+}
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+/* --- Console frame ------------------------------------------------------- */
+
+.app {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 1.25rem 1.1rem 2.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+/* --- Top rail ------------------------------------------------------------ */
+
+.rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-panel);
+  background: linear-gradient(180deg, rgba(24, 48, 47, 0.85), rgba(17, 34, 37, 0.9));
+}
+
+.rail__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.brand__name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--mist);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-chip);
+  padding: 0.16rem 0.55rem;
+  white-space: nowrap;
+}
+
+/* --- Link chip ----------------------------------------------------------- */
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-chip);
+  background: var(--hull-2);
+}
+
+.link__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--mist);
+  flex: none;
+}
+
+.link__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.link__latency {
+  font-family: var(--font-data);
+  font-size: 0.72rem;
+  color: var(--mist);
+}
+
+.link--ok .link__dot {
+  background: var(--green);
+  animation: link-pulse 2.4s ease-in-out infinite;
+}
+
+.link--warn .link__dot {
+  background: var(--amber);
+}
+
+.link--error .link__dot,
+.link--offline .link__dot {
+  background: var(--red);
+}
+
+@keyframes link-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(79, 180, 119, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(79, 180, 119, 0.04);
+  }
+}
+
+/* --- Problem banner ------------------------------------------------------ */
+
+.alert {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid rgba(224, 82, 63, 0.45);
+  border-left: 3px solid var(--red);
+  border-radius: var(--r-panel);
+  background: rgba(224, 82, 63, 0.08);
+}
+
+.alert__title {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.alert__detail {
+  font-family: var(--font-data);
+  font-size: 0.76rem;
+  color: var(--mist);
+  overflow-wrap: anywhere;
+}
+
+.alert__hint {
+  font-size: 0.73rem;
+  color: var(--mist);
+}
+
+/* --- Console layout ------------------------------------------------------ */
+
+.console {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-areas:
+    "view"
+    "drive"
+    "status";
+  animation: console-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes console-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.panel {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.8rem;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-panel);
+  background: linear-gradient(180deg, rgba(24, 48, 47, 0.5), rgba(17, 34, 37, 0.85));
+}
+
+.panel--view {
+  grid-area: view;
+}
+
+.panel--drive {
+  grid-area: drive;
+  /* The drive surface is an instrument, not a document: no text caret and no
+     accidental text selection while dragging the stick or the fader. */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.panel--status {
+  grid-area: status;
+}
+
+.panel__title {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--mist);
+}
+
+@media (min-width: 1040px) {
+  .console {
+    grid-template-columns: minmax(0, 1.72fr) minmax(300px, 1fr);
+    grid-template-areas:
+      "view drive"
+      "status drive";
+    align-items: start;
+  }
+}
+
+/* --- Camera viewport (hero) --------------------------------------------- */
+
+.view {
+  position: relative;
+  /* The frame sets the shape; the canvas redraws to fit it. */
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-inset);
+  background: #081113;
+}
+
+.view__video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Fill the frame; on a portrait phone the sides are cropped rather than
+     shrinking the feed to a strip. */
+  object-fit: cover;
+  background: #05070a;
+}
+
+/* Live / Sim source switch. */
+.view__modes {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.15rem;
+  background: rgba(6, 14, 16, 0.72);
+  border: 1px solid var(--seam);
+  border-radius: 6px;
+}
+
+.view__mode {
+  padding: 0.15rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--mist);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.view__mode:hover {
+  color: var(--chalk);
+}
+
+.view__mode[aria-pressed="true"] {
+  color: var(--chalk);
+  background: var(--hull-2);
+  box-shadow: inset 0 0 0 1px var(--seam);
+}
+
+/* --- Network reload veil (model switch) ----------------------------------- */
+
+.veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1.1rem;
+  background:
+    linear-gradient(rgba(6, 14, 16, 0.82), rgba(6, 14, 16, 0.88)),
+    repeating-linear-gradient(0deg, rgba(35, 64, 62, 0.14) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(90deg, rgba(35, 64, 62, 0.1) 0 1px, transparent 1px 26px);
+  animation: veil-in 0.4s ease-out;
+}
+
+@keyframes veil-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.veil__frame {
+  position: relative;
+  width: min(56%, 240px);
+  aspect-ratio: 16 / 9;
+}
+
+.veil__corner {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 0 solid var(--signal);
+  filter: drop-shadow(0 0 4px rgba(242, 118, 46, 0.55));
+}
+
+.veil__corner--tl {
+  top: 0;
+  left: 0;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+.veil__corner--tr {
+  top: 0;
+  right: 0;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+.veil__corner--bl {
+  bottom: 0;
+  left: 0;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+.veil__corner--br {
+  bottom: 0;
+  right: 0;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}
+
+.veil__scan {
+  position: absolute;
+  top: 0;
+  left: 3%;
+  right: 3%;
+  height: 1px;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, var(--signal), transparent);
+  animation: veil-scan 5s linear infinite;
+}
+
+@keyframes veil-scan {
+  0% {
+    top: 2%;
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.85;
+  }
+  92% {
+    opacity: 0.85;
+  }
+  100% {
+    top: 96%;
+    opacity: 0;
+  }
+}
+
+.veil__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0;
+  text-align: center;
+}
+
+.veil__text strong {
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--chalk);
+}
+
+.veil__hint {
+  font-size: 0.72rem;
+  color: var(--mist);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .veil {
+    animation: none;
+  }
+  .veil__scan {
+    animation: none;
+    top: 50%;
+    opacity: 0.25;
+  }
+}
+
+/* Synthetic fallback drawn in the browser, only when there is no live picture. */
+.sim-feed {
+  position: absolute;
+  inset: 0;
+}
+
+.sim-feed__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Shown while there is no picture: it must say what is wrong, not just be black.
+   The scrim is light on purpose so the synthetic scene stays visible underneath. */
+.view__status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 1rem;
+  text-align: center;
+  background: rgba(6, 14, 16, 0.35);
+}
+
+/* Broadcast-style slate: the fallback must never pass for the real camera. */
+.view__watermark {
+  margin-bottom: 0.15rem;
+  padding: 0.2rem 0.65rem;
+  font-size: clamp(0.9rem, 4.2vw, 1.5rem);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-indent: 0.14em;
+  color: #fff;
+  background: rgba(224, 82, 63, 0.94);
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.view__status-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.view__status-detail {
+  font-size: 0.74rem;
+  color: var(--mist);
+}
+
+.view__status-url {
+  font-family: var(--font-data);
+  font-size: 0.66rem;
+  color: var(--mist);
+  overflow-wrap: anywhere;
+}
+
+.view__retry {
+  margin-top: 0.3rem;
+  padding: 0.4rem 0.8rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--chalk);
+  background: var(--hull-2);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-inset);
+  cursor: pointer;
+}
+
+.view__retry:hover {
+  border-color: var(--signal);
+}
+
+.view__badge {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #1c1206;
+  background: rgba(228, 178, 60, 0.92);
+  padding: 0.14rem 0.45rem;
+  border-radius: 3px;
+}
+
+.view__osd {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.4rem 0.8rem 0.6rem;
+  background: linear-gradient(0deg, rgba(6, 14, 16, 0.88), transparent);
+}
+
+.osd {
+  display: flex;
+  gap: 1.15rem;
+}
+
+.osd__item {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.osd__label {
+  font-size: 0.63rem;
+  color: rgba(231, 239, 234, 0.62);
+}
+
+.osd__value {
+  font-family: var(--font-data);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.osd__value--live {
+  color: var(--signal);
+}
+
+/* --- Detection overlay ---------------------------------------------------- */
+
+.detections {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.detections__box {
+  fill: none;
+  stroke: var(--signal);
+  stroke-width: 2;
+}
+
+.detections__label {
+  fill: var(--chalk);
+  font-family: var(--font-data);
+  font-size: 18px;
+  font-weight: 600;
+  /* An outline keeps the text readable over any picture. */
+  paint-order: stroke;
+  stroke: rgba(6, 14, 16, 0.9);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 640px) {
+  /* The SVG scales with the frame, so the base size has to grow to stay
+     readable once the picture is scaled down. */
+  .detections__label {
+    font-size: 30px;
+  }
+}
+
+/* --- Pose overlay --------------------------------------------------------- */
+
+.pose {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.pose__bone {
+  stroke: var(--signal);
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+
+.pose__joint {
+  fill: var(--chalk);
+  stroke: var(--signal);
+  stroke-width: 2;
+}
+
+.pose__label {
+  fill: var(--chalk);
+  font-family: var(--font-data);
+  font-size: 18px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: rgba(6, 14, 16, 0.9);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 640px) {
+  /* Same reason as the detection label: the SVG scales with the frame. */
+  .pose__label {
+    font-size: 30px;
+  }
+}
+
+/* --- Drive panel --------------------------------------------------------- */
+
+.stick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stick__well {
+  position: relative;
+  width: clamp(180px, 54vw, 240px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid var(--seam);
+  background: radial-gradient(circle at 50% 36%, #1b3231, #0c181a 72%);
+  box-shadow: inset 0 3px 16px rgba(0, 0, 0, 0.65);
+  touch-action: none;
+  cursor: grab;
+}
+
+.stick__well:active {
+  cursor: grabbing;
+}
+
+.stick--disabled .stick__well {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.stick__well::before {
+  content: "";
+  position: absolute;
+  inset: 20px;
+  border-radius: 50%;
+  border: 1px dashed rgba(144, 168, 163, 0.2);
+}
+
+.stick__axis {
+  position: absolute;
+  inset: 24px;
+  background:
+    linear-gradient(rgba(144, 168, 163, 0.16), rgba(144, 168, 163, 0.16)) center / 1px 100%
+      no-repeat,
+    linear-gradient(rgba(144, 168, 163, 0.16), rgba(144, 168, 163, 0.16)) center / 100% 1px
+      no-repeat;
+}
+
+.stick__knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 62px;
+  height: 62px;
+  margin: -31px 0 0 -31px;
+  border-radius: 50%;
+  border: 1px solid var(--seam);
+  background: radial-gradient(circle at 34% 28%, #486864, #1c3331 72%);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.stick--engaged .stick__knob {
+  border-color: rgba(242, 118, 46, 0.75);
+  background: radial-gradient(circle at 34% 28%, #ffa469, var(--signal) 72%);
+  box-shadow:
+    0 6px 18px rgba(242, 118, 46, 0.35),
+    0 0 0 7px rgba(242, 118, 46, 0.1);
+}
+
+.stick__hint,
+.hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--mist);
+  text-align: center;
+}
+
+/* Joystick / Arrows source switch, same look as the video one. */
+.drive__modes {
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.15rem;
+  background: rgba(6, 14, 16, 0.72);
+  border: 1px solid var(--seam);
+  border-radius: 6px;
+  align-self: flex-start;
+}
+
+.drive__mode {
+  padding: 0.15rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--mist);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.drive__mode:hover {
+  color: var(--chalk);
+}
+
+.drive__mode[aria-pressed="true"] {
+  color: var(--chalk);
+  background: var(--hull-2);
+  box-shadow: inset 0 0 0 1px var(--seam);
+}
+
+/* --- AI model choice ------------------------------------------------------ */
+
+.model {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.model__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.model__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--mist);
+}
+
+.model__state {
+  font-size: 0.7rem;
+  color: var(--signal);
+}
+
+.model__options {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.model__option {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--mist);
+  background: rgba(6, 14, 16, 0.5);
+  border: 1px solid var(--seam);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.model__option:hover:not(:disabled) {
+  color: var(--chalk);
+}
+
+.model__option[aria-pressed="true"] {
+  color: var(--chalk);
+  background: var(--hull-2);
+  box-shadow: inset 0 0 0 1px var(--seam);
+}
+
+/* A short confirmation after a switch lands: the just-loaded button glows. */
+.model__option--loaded {
+  border-color: var(--signal);
+  box-shadow:
+    inset 0 0 0 1px var(--signal),
+    0 0 12px rgba(242, 118, 46, 0.35);
+}
+
+.model__option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.model__error {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--red);
+}
+
+.model__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--mist);
+}
+
+/* The only animation on the panel: an indeterminate sweep while the sensor is
+   reconfiguring. It is honest (no fake percentage) and stops the moment the new
+   network is live. */
+.model__progress {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: var(--seam-soft);
+}
+
+.model__progress-track {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  background: linear-gradient(90deg, transparent, var(--signal), transparent);
+  border-radius: 1px;
+  animation: model-sweep 1.3s ease-in-out infinite;
+}
+
+@keyframes model-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(320%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model__progress-track {
+    animation: none;
+    width: 100%;
+    opacity: 0.35;
+  }
+}
+
+/* --- Follow behaviour (Phase 7) ------------------------------------------- */
+
+.follow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.follow__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.follow__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--mist);
+}
+
+.follow__state {
+  font-size: 0.7rem;
+  color: var(--signal);
+}
+
+.follow__toggle {
+  padding: 0.35rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--mist);
+  background: rgba(6, 14, 16, 0.5);
+  border: 1px solid var(--seam);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.follow__toggle:hover:not(:disabled) {
+  color: var(--chalk);
+}
+
+.follow__toggle--on {
+  color: var(--chalk);
+  background: var(--hull-2);
+  border-color: var(--signal);
+  box-shadow: inset 0 0 0 1px var(--signal);
+}
+
+.follow__toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.follow__error {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--red);
+}
+
+.follow__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--mist);
+}
+
+/* --- D-pad (arrow drive) -------------------------------------------------- */
+
+.pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pad__grid {
+  display: grid;
+  grid-template-areas:
+    ". forward ."
+    "left . right"
+    ". back .";
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  width: min(100%, 210px);
+  gap: 0.4rem;
+}
+
+.pad__button {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  line-height: 1;
+  background: radial-gradient(circle at 34% 28%, #486864, #1c3331 72%);
+  border: 1px solid var(--seam);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.pad__button:hover:not(:disabled) {
+  border-color: var(--mist);
+}
+
+.pad__button--pressed,
+.pad__button:active:not(:disabled) {
+  border-color: rgba(242, 118, 46, 0.75);
+  background: radial-gradient(circle at 34% 28%, #ffa469, var(--signal) 72%);
+  box-shadow:
+    0 6px 18px rgba(242, 118, 46, 0.35),
+    0 0 0 7px rgba(242, 118, 46, 0.1);
+}
+
+.pad__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pad__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--mist);
+  text-align: center;
+}
+
+/* --- Throttle fader ------------------------------------------------------ */
+
+.fader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.fader__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.fader__label {
+  font-size: 0.7rem;
+  color: var(--mist);
+}
+
+.fader__value {
+  font-family: var(--font-data);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.fader__input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.fader__input::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 1px solid var(--seam);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--signal) 0 var(--fill, 100%),
+    rgba(144, 168, 163, 0.16) var(--fill, 100%) 100%
+  );
+}
+
+.fader__input::-moz-range-track {
+  height: 6px;
+  border: 1px solid var(--seam);
+  border-radius: 999px;
+  background: rgba(144, 168, 163, 0.16);
+}
+
+.fader__input::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--signal);
+}
+
+.fader__input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 20px;
+  margin-top: -7px;
+  border: 1px solid #0b1518;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #f2f6f3, #c6d4cf);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.fader__input::-moz-range-thumb {
+  width: 13px;
+  height: 20px;
+  border: 1px solid #0b1518;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #f2f6f3, #c6d4cf);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.fader__scale {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-data);
+  font-size: 0.6rem;
+  color: var(--mist);
+}
+
+/* --- Axis readout -------------------------------------------------------- */
+
+.axes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.axis {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-inset);
+  background: var(--hull-2);
+}
+
+.axis__label {
+  font-size: 0.66rem;
+  color: var(--mist);
+}
+
+.axis__value {
+  font-family: var(--font-data);
+  font-size: 1.12rem;
+  font-weight: 600;
+}
+
+.axis--live .axis__value {
+  color: var(--signal);
+}
+
+/* --- Status readouts ----------------------------------------------------- */
+
+.readouts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.batt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-inset);
+  background: var(--hull-2);
+}
+
+.batt__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.batt__label {
+  font-size: 0.7rem;
+  color: var(--mist);
+}
+
+.batt__value {
+  font-family: var(--font-data);
+  font-size: 1.45rem;
+  font-weight: 600;
+}
+
+.batt__state {
+  align-self: flex-start;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--signal);
+}
+
+.batt__volt {
+  font-family: var(--font-data);
+  font-size: 0.7rem;
+  color: var(--mist);
+}
+
+.batt__cells {
+  display: flex;
+  gap: 3px;
+}
+
+.batt__cell {
+  flex: 1;
+  height: 11px;
+  border-radius: 2px;
+  background: rgba(144, 168, 163, 0.16);
+}
+
+.batt__cell--on {
+  background: var(--green);
+}
+
+.batt--medium .batt__cell--on {
+  background: var(--amber);
+}
+
+.batt--low .batt__cell--on {
+  background: var(--red);
+}
+
+.gauges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 0.5rem;
+}
+
+.gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-inset);
+  background: var(--hull-2);
+}
+
+.gauge__label {
+  font-size: 0.65rem;
+  color: var(--mist);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gauge__value {
+  font-family: var(--font-data);
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+.readouts__stamp {
+  font-family: var(--font-data);
+  font-size: 0.66rem;
+  color: var(--mist);
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--mist);
+}
+
+/* --- Footer -------------------------------------------------------------- */
+
+.foot {
+  font-size: 0.72rem;
+  color: var(--mist);
+  text-align: center;
+}
+
+/* --- Phones -------------------------------------------------------------- */
+/* Give the camera the whole width of the screen and a taller frame: on a
+   portrait phone a 16:9 strip is too small to drive by. Nothing is cropped —
+   the synthetic scene is redrawn to the new shape. */
+
+@media (max-width: 640px) {
+  .app {
+    padding: 0.7rem 0.55rem 1.6rem;
+    gap: 0.6rem;
+  }
+
+  /* Drop the panel chrome so every pixel goes to the viewport itself. */
+  .panel--view {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .panel--view .view {
+    border-radius: var(--r-panel);
+  }
+
+  .view {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+/* --- Motion preferences -------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .console,
+  .link--ok .link__dot {
+    animation: none;
+  }
+}
