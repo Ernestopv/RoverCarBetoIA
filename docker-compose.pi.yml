@@ -9,8 +9,8 @@
 #    reachable with full device access. Verified empirically on the Pi: without
 #    `privileged` the driver reports "Could not open any dmaHeap device".
 #    This is a real trade-off: that container has access to every device.
-#  - MediaMTX must advertise the Pi's LAN address, because the phone reaches it
-#    through the published port and cannot route to the container's own IPs.
+#  - MediaMTX runs with host networking, so it advertises the Pi's current LAN
+#    address automatically; no fixed IP is configured here.
 #
 # The API is published on 8001 by default so it never collides with anything
 # already running on the board.
@@ -70,12 +70,6 @@ services:
       CAMERA_VFLIP: ${CAMERA_VFLIP:-true}
     ports: !override
       - "${API_PORT:-8001}:8000"
-
-  mediamtx:
-    environment:
-      # The browser connects to http://<pi-lan-ip>:8889/rover/whep, so ICE must
-      # advertise that address.
-      MTX_WEBRTCADDITIONALHOSTS: ${MEDIAMTX_ADDITIONAL_HOSTS:-192.168.1.83}
 
   ui:
     # `!override` is required: Compose *appends* lists when merging files, so

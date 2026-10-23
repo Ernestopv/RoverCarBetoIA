@@ -13,14 +13,17 @@ services:
       ROVER_MODE: ${ROVER_MODE:-simulator}
       CAMERA_MODE: ${CAMERA_MODE:-simulator}
       CAMERA_AUTOSTART: ${CAMERA_AUTOSTART:-true}
-      # Inside the compose network MediaMTX is reachable by service name.
-      MEDIAMTX_HOST: mediamtx
+      # MediaMTX runs with host networking, so it is reached through the host
+      # gateway instead of a compose service name.
+      MEDIAMTX_HOST: host.docker.internal
       MEDIAMTX_RTSP_PORT: "8554"
       MEDIAMTX_WEBRTC_PORT: "8889"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENVIRONMENT: ${ENVIRONMENT:-docker}
     depends_on:
       - mediamtx
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${API_PORT:-8000}:8000"
     logging: *default-logging
@@ -30,19 +33,14 @@ services:
   # It never records: recording is disabled in docker/mediamtx.yml.
   mediamtx:
     image: bluenviron/mediamtx:1.21.1
-    environment:
-      # A browser on the Docker host must reach the ICE listener through the
-      # published UDP port, so advertise the loopback address as well as the
-      # interface addresses. Harmless when MediaMTX runs natively on the Pi.
-      MTX_WEBRTCADDITIONALHOSTS: ${MEDIAMTX_ADDITIONAL_HOSTS:-127.0.0.1}
+    # Host networking: MediaMTX sees the Pi's real interfaces, so
+    # `webrtcIPsFromInterfaces` advertises the current LAN IP automatically and
+    # no MTX_WEBRTCADDITIONALHOSTS is needed. It also removes the Docker NAT hop
+    # from the WebRTC path. The API stays local-only via `apiAddress` in
+    # docker/mediamtx.yml.
+    network_mode: host
     volumes:
       - ./docker/mediamtx.yml:/mediamtx.yml:ro
-    ports:
-      - "${MEDIAMTX_RTSP_PORT:-8554}:8554"
-      - "${MEDIAMTX_WEBRTC_PORT:-8889}:8889"
-      # Diagnostics only: bound to the local machine, never to the network.
-      - "127.0.0.1:${MEDIAMTX_API_PORT:-9997}:9997"
-      - "${MEDIAMTX_ICE_UDP_PORT:-8189}:8189/udp"
     logging: *default-logging
     restart: unless-stopped
 

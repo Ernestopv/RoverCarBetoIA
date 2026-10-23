@@ -19,7 +19,7 @@ udpMaxPayloadSize: 1472
 
 # Control API. Used for local diagnostics of the live stream.
 api: true
-apiAddress: :9997
+apiAddress: 127.0.0.1:9997
 
 # NOTE: declaring this list replaces the built-in default, so the publish/read
 # rules must be kept here or the stream would stop working.
